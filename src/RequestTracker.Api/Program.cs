@@ -26,6 +26,12 @@ await using var app = builder.Build();
 // `dotnet run --project src/RequestTracker.Api -- seed`: regenerate the test data, then exit without serving requests.
 if (args.Contains("seed"))
 {
+    // The seeder drops the database, so a misconfigured environment must not be able to point it at real data.
+    if (!app.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException("The seed command recreates the database and runs only in Development.");
+    }
+
     await app.Services.SeedDatabaseAsync();
     return;
 }

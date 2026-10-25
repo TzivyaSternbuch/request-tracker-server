@@ -19,6 +19,7 @@ public class DataSeeder(RequestTrackerDbContext db, TimeProvider timeProvider, I
     private const int MaxDaysUntilUpdate = 60;
 
     // Startup seeding: a database that already has requests is left as it is, so restarts keep changes made through the app.
+    // Startup has just migrated the database, so it is filled in place rather than recreated.
     public async Task SeedIfEmptyAsync(int requestCount = DefaultRequestCount, CancellationToken cancellationToken = default)
     {
         if (await db.Requests.AnyAsync(cancellationToken))
@@ -26,16 +27,24 @@ public class DataSeeder(RequestTrackerDbContext db, TimeProvider timeProvider, I
             return;
         }
 
-        await SeedAsync(requestCount, cancellationToken);
+        await InsertRequestsAsync(requestCount, cancellationToken);
     }
 
     public async Task SeedAsync(int requestCount = DefaultRequestCount, CancellationToken cancellationToken = default)
     {
-        var started = timeProvider.GetTimestamp();
-
         // Recreating the database (not deleting rows) also resets the identity columns, so Ids start at 1 on every run.
         await db.Database.EnsureDeletedAsync(cancellationToken);
         await db.Database.MigrateAsync(cancellationToken);
+
+        await InsertRequestsAsync(requestCount, cancellationToken);
+    }
+
+    private async Task InsertRequestsAsync(int requestCount, CancellationToken cancellationToken)
+    {
+        var started = timeProvider.GetTimestamp();
+
+        // All or nothing: a run stopped halfway would otherwise leave a partly filled table that startup treats as seeded.
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
         var random = new Random(RandomSeed);
         var organizations = CreateOrganizations(random);
@@ -52,6 +61,8 @@ public class DataSeeder(RequestTrackerDbContext db, TimeProvider timeProvider, I
             // Tracked entities would otherwise pile up and slow every later batch.
             db.ChangeTracker.Clear();
         }
+
+        await transaction.CommitAsync(cancellationToken);
 
         logger.LogInformation(
             "Seeded {RequestCount} requests in {ElapsedSeconds:F1} s",
