@@ -9,10 +9,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        // Read when the context is first resolved, so configuration added by the test host is already in place.
-        services.AddDbContext<RequestTrackerDbContext>(options => options.UseSqlServer(
-            configuration.GetConnectionString("RequestTracker")
-            ?? throw new InvalidOperationException("Connection string 'RequestTracker' is not configured.")));
+        var connectionString = configuration.GetConnectionString("RequestTracker")
+            ?? throw new InvalidOperationException("Connection string 'RequestTracker' is not configured.");
+        services.AddDbContext<RequestTrackerDbContext>(options => options.UseSqlServer(connectionString));
         return services;
     }
 

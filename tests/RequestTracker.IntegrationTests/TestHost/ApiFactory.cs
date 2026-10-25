@@ -14,11 +14,14 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public async Task InitializeAsync() => await _database.StartAsync();
 
-    public new async Task DisposeAsync()
+    // Overrides the factory's own DisposeAsync, so every disposal path also stops the container.
+    public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
         await _database.DisposeAsync();
     }
+
+    Task IAsyncLifetime.DisposeAsync() => DisposeAsync().AsTask();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

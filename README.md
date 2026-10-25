@@ -31,11 +31,11 @@ Run these commands from this folder (`backend/` in the main repository):
 
    Open Swagger UI at http://localhost:5100/swagger. The OpenAPI document is at http://localhost:5100/openapi/v1.json.
 
-4. Run the tests (no Docker needed yet):
+4. Run the tests. Docker must be running: the integration tests start their own SQL Server container.
 
    ```bash
    dotnet test
    ```
 
-The database schema is applied when the API starts in Development, from task 05 on. The SQL Server password in
+The database schema is applied when the API starts in Development. The SQL Server password in
 `compose.yaml` and `appsettings.Development.json` is for local development only.
