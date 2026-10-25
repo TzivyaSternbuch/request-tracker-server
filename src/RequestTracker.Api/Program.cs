@@ -20,12 +20,31 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddOpenApi();
 
-var app = builder.Build();
+// Disposed on exit, which flushes the console logger, so the seed command's last log line isn't lost.
+await using var app = builder.Build();
+
+// `dotnet run --project src/RequestTracker.Api -- seed`: regenerate the test data, then exit without serving requests.
+if (args.Contains("seed"))
+{
+    // The seeder drops the database, so a misconfigured environment must not be able to point it at real data.
+    if (!app.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException("The seed command recreates the database and runs only in Development.");
+    }
+
+    await app.Services.SeedDatabaseAsync();
+    return;
+}
 
 if (app.Environment.IsDevelopment())
 {
     // Creates the database if needed and applies pending migrations, so running locally needs no manual step.
     await app.Services.MigrateDatabaseAsync();
+
+    if (app.Configuration.GetValue<bool>("Seeding:SeedOnStartup"))
+    {
+        await app.Services.SeedDatabaseIfEmptyAsync();
+    }
 }
 
 app.UseExceptionHandler();
