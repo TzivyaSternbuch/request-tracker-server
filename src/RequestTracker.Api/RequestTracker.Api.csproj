@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RequestTracker.Core\RequestTracker.Core.csproj" />
+    <ProjectReference Include="..\RequestTracker.Infrastructure\RequestTracker.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
