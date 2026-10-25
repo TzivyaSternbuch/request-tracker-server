@@ -1,10 +1,13 @@
 using System.Net;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using RequestTracker.IntegrationTests.TestHost;
 
 namespace RequestTracker.IntegrationTests;
 
-public sealed class ErrorHandlingTests(ApiFactory factory) : IClassFixture<ApiFactory>
+[Collection(ApiCollection.Name)]
+public sealed class ErrorHandlingTests(ApiFactory factory)
 {
     private readonly HttpClient _client = factory.CreateClient();
 
@@ -40,6 +43,50 @@ public sealed class ErrorHandlingTests(ApiFactory factory) : IClassFixture<ApiFa
         var body = await ProblemAssert.IsProblemAsync(response, HttpStatusCode.BadRequest);
         var errors = body.GetProperty("errors");
         Assert.Equal(TestController.NestedValidationMessage, errors.GetProperty("items[0].version")[0].GetString());
+    }
+
+    [Fact]
+    public async Task Throw_ValidationExceptionWithoutErrors_Returns400WithMessage()
+    {
+        var response = await _client.GetAsync("/test/throw/validation-message");
+
+        var body = await ProblemAssert.IsProblemAsync(response, HttpStatusCode.BadRequest);
+        Assert.Equal(TestController.RequestLevelValidationMessage, body.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Throw_ValidationFailureWithoutPropertyName_Returns400UnderEmptyKey()
+    {
+        var response = await _client.GetAsync("/test/throw/validation-unnamed");
+
+        var body = await ProblemAssert.IsProblemAsync(response, HttpStatusCode.BadRequest);
+        var errors = body.GetProperty("errors");
+        Assert.Equal(TestController.RequestLevelValidationMessage, errors.GetProperty("")[0].GetString());
+    }
+
+    [Fact]
+    public async Task Throw_DomainExceptionWithHtmlAccept_StillReturnsProblemDetailsWithDetail()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/test/throw/conflict");
+        request.Headers.Accept.ParseAdd("text/html");
+
+        var response = await _client.SendAsync(request);
+
+        var body = await ProblemAssert.IsProblemAsync(response, HttpStatusCode.Conflict);
+        Assert.Equal(TestController.ConflictMessage, body.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task AbortedRequest_DoesNotLogError()
+    {
+        var logs = new CapturingLoggerProvider();
+        using var host = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services => services.AddSingleton<ILoggerProvider>(logs)));
+        var client = host.CreateClient();
+
+        await Assert.ThrowsAnyAsync<Exception>(() => client.GetAsync("/test/throw/aborted"));
+
+        Assert.DoesNotContain(LogLevel.Error, logs.Levels);
     }
 
     [Fact]

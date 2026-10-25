@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using RequestTracker.Api.ErrorHandling;
@@ -12,12 +13,9 @@ builder.Services
     .AddControllers(options =>
         // Model-binding errors use the JSON (camelCase) property names, matching the request body.
         options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider()))
-    .AddJsonOptions(options =>
-        // Numbers are rejected so a value like 99 can't bind to an undefined enum member.
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)));
-// The OpenAPI document reads these options, not the MVC ones above; without this it describes enums as integers.
-builder.Services.ConfigureHttpJsonOptions(options =>
-    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)));
+    .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
+// The OpenAPI document reads these options, not the MVC ones above; without them it describes enums as integers.
+builder.Services.ConfigureHttpJsonOptions(options => ConfigureJson(options.SerializerOptions));
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddOpenApi();
@@ -37,3 +35,8 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 
 app.Run();
+
+// One JSON configuration for both option sets, so the API and its OpenAPI document can't drift apart.
+static void ConfigureJson(JsonSerializerOptions options) =>
+    // Numbers are rejected so a value like 99 can't bind to an undefined enum member.
+    options.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false));

@@ -6,20 +6,11 @@ using RequestTracker.Core.Exceptions;
 
 namespace RequestTracker.Api.ErrorHandling;
 
-public sealed class GlobalExceptionHandler(
-    IProblemDetailsService problemDetails,
-    ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
+public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        // The client is gone: nothing can be written, and it isn't a server fault.
-        if (exception is OperationCanceledException && httpContext.RequestAborted.IsCancellationRequested)
-        {
-            logger.LogInformation("Request {Path} was aborted by the client", httpContext.Request.Path);
-            return true;
-        }
-
         var problem = exception switch
         {
             ValidationException validation => ToValidationProblem(validation),
@@ -36,13 +27,8 @@ public sealed class GlobalExceptionHandler(
             problem = Problem(StatusCodes.Status500InternalServerError, detail: null);
         }
 
-        httpContext.Response.StatusCode = problem.Status!.Value;
-        return await problemDetails.TryWriteAsync(new ProblemDetailsContext
-        {
-            HttpContext = httpContext,
-            ProblemDetails = problem,
-            Exception = exception,
-        });
+        await TypedResults.Problem(problem).ExecuteAsync(httpContext);
+        return true;
     }
 
     private static ProblemDetails Problem(int status, string? detail) => new() { Status = status, Detail = detail };
@@ -54,10 +40,18 @@ public sealed class GlobalExceptionHandler(
             .GroupBy(e => ToJsonPath(e.PropertyName))
             .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
 
-        return new ValidationProblemDetails(errors) { Status = StatusCodes.Status400BadRequest };
+        return new ValidationProblemDetails(errors)
+        {
+            Status = StatusCodes.Status400BadRequest,
+            // A ValidationException thrown with only a message has no errors; the message is the explanation.
+            Detail = errors.Count == 0 ? exception.Message : null,
+        };
     }
 
-    // "Items[0].Version" → "items[0].version": every segment, not only the first character.
-    private static string ToJsonPath(string propertyName) =>
-        string.Join('.', propertyName.Split('.').Select(JsonNamingPolicy.CamelCase.ConvertName));
+    // "Items[0].Version" → "items[0].version": every segment, not only the first character. A failure that
+    // isn't about one property goes under "", like model-level errors from model binding.
+    private static string ToJsonPath(string? propertyName) =>
+        string.IsNullOrEmpty(propertyName)
+            ? string.Empty
+            : string.Join('.', propertyName.Split('.').Select(JsonNamingPolicy.CamelCase.ConvertName));
 }

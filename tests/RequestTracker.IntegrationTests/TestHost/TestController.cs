@@ -14,6 +14,7 @@ public sealed class TestController : ControllerBase
     public const string TransitionMessage = "Request 42 cannot move from Completed to New.";
     public const string ValidationMessage = "Status is required.";
     public const string NestedValidationMessage = "Version is required.";
+    public const string RequestLevelValidationMessage = "Between 1 and 100 items are allowed.";
     public const string InternalMessage = "secret-internal-detail";
 
     [HttpGet("throw/{kind}")]
@@ -25,8 +26,18 @@ public sealed class TestController : ControllerBase
         "validation" => throw new ValidationException([new ValidationFailure("Status", ValidationMessage)]),
         "validation-nested" => throw new ValidationException(
             [new ValidationFailure("Items[0].Version", NestedValidationMessage)]),
+        "validation-message" => throw new ValidationException(RequestLevelValidationMessage),
+        "validation-unnamed" => throw new ValidationException(
+            [new ValidationFailure(null!, RequestLevelValidationMessage)]),
+        "aborted" => Abort(),
         _ => throw new InvalidOperationException(InternalMessage),
     };
+
+    private IActionResult Abort()
+    {
+        HttpContext.Abort();
+        throw new OperationCanceledException(HttpContext.RequestAborted);
+    }
 
     [HttpGet("json")]
     public TestPayload GetJson() => new() { SomeValue = "Value", Kind = TestKind.Medium };

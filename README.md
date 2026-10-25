@@ -14,7 +14,8 @@ Run these commands from this folder (`backend/` in the main repository):
    docker compose up -d
    ```
 
-   Wait until `docker compose ps` shows the `sqlserver` service as `healthy`.
+   Wait until `docker compose ps` shows the `sqlserver` service as `healthy`. The container uses port 1433; if a
+   local SQL Server already listens there, stop it first, or the container can't start.
 
 2. Restore the local tools (`dotnet-ef`):
 
@@ -28,7 +29,7 @@ Run these commands from this folder (`backend/` in the main repository):
    dotnet run --project src/RequestTracker.Api
    ```
 
-   Swagger UI opens at http://localhost:5100/swagger. The OpenAPI document is at http://localhost:5100/openapi/v1.json.
+   Open Swagger UI at http://localhost:5100/swagger. The OpenAPI document is at http://localhost:5100/openapi/v1.json.
 
 4. Run the tests (no Docker needed yet):
 

@@ -17,7 +17,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\RequestTracker.Core\RequestTracker.Core.csproj" />
-    <ProjectReference Include="..\..\src\RequestTracker.Api\RequestTracker.Api.csproj" />
   </ItemGroup>
 
 </Project>

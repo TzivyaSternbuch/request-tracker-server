@@ -4,7 +4,8 @@ using RequestTracker.IntegrationTests.TestHost;
 
 namespace RequestTracker.IntegrationTests;
 
-public sealed class OpenApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
+[Collection(ApiCollection.Name)]
+public sealed class OpenApiTests(ApiFactory factory)
 {
     private readonly HttpClient _client = factory.CreateClient();
 
