@@ -22,6 +22,12 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+{
+    // Creates the database if needed and applies pending migrations, so running locally needs no manual step.
+    await app.Services.MigrateDatabaseAsync();
+}
+
 app.UseExceptionHandler();
 // Errors without an exception (unknown route, wrong method) get a ProblemDetails body too.
 app.UseStatusCodePages();
