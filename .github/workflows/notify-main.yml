@@ -1,0 +1,17 @@
+name: Notify main repository
+
+# Tells request-tracker that main moved, so it updates its submodule pointer.
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send submodule-updated to request-tracker
+        env:
+          GH_TOKEN: ${{ secrets.MAIN_REPO_TOKEN }}
+        run: gh api repos/TzivyaSternbuch/request-tracker/dispatches -f event_type=submodule-updated
