@@ -31,6 +31,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             InitialCatalog = "RequestTracker",
         }.ConnectionString;
         builder.UseSetting("ConnectionStrings:RequestTracker", connectionString);
+        // 100,000 rows on every test run would only slow the tests down; DataSeederTests seed small counts themselves.
+        builder.UseSetting("Seeding:SeedOnStartup", "false");
 
         // TestController lives in this assembly, so it never ships with the API.
         builder.ConfigureTestServices(services =>

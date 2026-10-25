@@ -1,4 +1,4 @@
-# request-tracker-server
+﻿# request-tracker-server
 
 The .NET API of Request Tracker. Clone the main repository instead, which includes this one as its `backend/` submodule: https://github.com/TzivyaSternbuch/request-tracker
 
@@ -31,11 +31,21 @@ Run these commands from this folder (`backend/` in the main repository):
 
    Open Swagger UI at http://localhost:5100/swagger. The OpenAPI document is at http://localhost:5100/openapi/v1.json.
 
+   On the first start the database is empty, so the API creates the test data: 100,000 requests, in about 15 seconds.
+   Later starts keep the existing data.
+
 4. Run the tests. Docker must be running: the integration tests start their own SQL Server container.
 
    ```bash
    dotnet test
    ```
+
+To reset the test data at any time, stop the API and run the command below. It deletes and recreates the database with
+the same 100,000 requests, then exits:
+
+```bash
+dotnet run --project src/RequestTracker.Api -- seed
+```
 
 The database schema is applied when the API starts in Development. The SQL Server password in
 `compose.yaml` and `appsettings.Development.json` is for local development only.
