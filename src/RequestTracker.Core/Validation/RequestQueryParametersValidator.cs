@@ -31,7 +31,7 @@ public sealed class RequestQueryParametersValidator : AbstractValidator<RequestQ
             .WithMessage("'createdFrom' must be on or before 'createdTo'.");
 
         RuleForEach(p => p.Sort)
-            .Must(value => RequestSort.TryParse(value, out _))
+            .Must(value => string.IsNullOrWhiteSpace(value) || RequestSort.TryParse(value, out _))
             .WithMessage("'{PropertyValue}' is not a valid sort. Use a field name, optionally followed by ':asc' or ':desc'.");
 
         // A second key on the same field could never change the order.

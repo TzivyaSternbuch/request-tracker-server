@@ -11,7 +11,6 @@ builder.Services.AddCore();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services
     .AddControllers(options =>
-        // Model-binding errors use the JSON (camelCase) property names, matching the request body.
         options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider()))
     .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions))
     .ConfigureApiBehaviorOptions(options =>

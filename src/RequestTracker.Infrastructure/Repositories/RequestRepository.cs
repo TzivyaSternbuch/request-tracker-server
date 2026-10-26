@@ -16,6 +16,8 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
     {
         var query = Filter(db.Requests.AsNoTracking(), parameters);
 
+        // A separate statement from the page query: an update committed between the two can make totalCount
+        // differ from the rows by one. Known limitation; snapshot isolation would remove it (task 17).
         var totalCount = await query.CountAsync(cancellationToken);
 
         var sorted = Sort(query, parameters.ParseSort());
@@ -41,12 +43,17 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
             query = query.Where(r => parameters.Priority.Contains(r.Priority));
         }
 
-        if (!string.IsNullOrWhiteSpace(parameters.OrganizationName))
+        // Text values are trimmed: stray spaces from a text box would otherwise make the match fail silently.
+        var organizationName = parameters.OrganizationName?.Trim();
+        if (!string.IsNullOrEmpty(organizationName))
         {
-            query = query.Where(r => r.OrganizationName.StartsWith(parameters.OrganizationName));
+            query = query.Where(r => r.OrganizationName.StartsWith(organizationName));
         }
 
-        var assignees = parameters.AssignedTo.Where(a => !string.IsNullOrWhiteSpace(a)).ToArray();
+        var assignees = parameters.AssignedTo
+            .Where(a => !string.IsNullOrWhiteSpace(a))
+            .Select(a => a.Trim())
+            .ToArray();
         if (assignees.Length > 0)
         {
             query = query.Where(r => assignees.Contains(r.AssignedTo));
@@ -64,14 +71,20 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
             query = query.Where(r => r.CreatedAt < toExclusive);
         }
 
-        if (!string.IsNullOrWhiteSpace(parameters.Search))
+        var search = parameters.Search?.Trim();
+        if (!string.IsNullOrEmpty(search))
         {
             // LIKE '%x%' can't use an index; this scan is the documented bottleneck (docs/PERFORMANCE.md).
-            query = query.Where(r => r.Title.Contains(parameters.Search) || r.OrganizationName.Contains(parameters.Search));
+            query = query.Where(r => r.Title.Contains(search) || r.OrganizationName.Contains(search));
         }
 
         return query;
     }
+
+    // Fields whose index is (Field, CreatedAt) in RequestConfiguration: ending ties on CreatedAt lets the sort read
+    // that index in order instead of sorting the whole filtered set. Change both together.
+    private static readonly RequestSortField[] IndexedWithCreatedAt =
+        [RequestSortField.Status, RequestSortField.Priority, RequestSortField.AssignedTo];
 
     private static IOrderedQueryable<Request> Sort(IQueryable<Request> query, IReadOnlyList<RequestSort> sorts)
     {
@@ -81,9 +94,16 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
             ordered = AddSortKey(query, ordered, sort);
         }
 
+        var last = sorts[^1];
+        if (IndexedWithCreatedAt.Contains(last.Field) && sorts.All(s => s.Field != RequestSortField.CreatedAt))
+        {
+            ordered = ordered!.ThenBy(r => r.CreatedAt, last.Direction);
+        }
+
+        // Id last, so rows with equal values keep one order across pages.
         return sorts.Any(s => s.Field == RequestSortField.Id)
             ? ordered!
-            : ordered!.ThenBy(r => r.Id, sorts[^1].Direction);
+            : ordered!.ThenBy(r => r.Id, last.Direction);
     }
 
     private static IOrderedQueryable<Request> AddSortKey(

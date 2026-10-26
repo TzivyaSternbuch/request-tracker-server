@@ -30,10 +30,15 @@ public record RequestQueryParameters
 
     public string[] Sort { get; init; } = [];
 
-    public IReadOnlyList<RequestSort> ParseSort() =>
-        Sort.Length == 0
-            ? [RequestSort.Default]
-            : Sort.Select(value => RequestSort.TryParse(value, out var sort)
+    // Blank values are ignored, like blank filters, so an emptied sort falls back to the default order.
+    public IReadOnlyList<RequestSort> ParseSort()
+    {
+        var sorts = Sort
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => RequestSort.TryParse(value, out var sort)
                 ? sort
-                : throw new InvalidOperationException("Sort values must be validated before parsing.")).ToList();
+                : throw new InvalidOperationException("Sort values must be validated before parsing."))
+            .ToList();
+        return sorts.Count == 0 ? [RequestSort.Default] : sorts;
+    }
 }

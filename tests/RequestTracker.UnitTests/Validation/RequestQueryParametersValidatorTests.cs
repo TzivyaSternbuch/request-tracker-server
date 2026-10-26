@@ -208,12 +208,32 @@ public sealed class RequestQueryParametersValidatorTests
         result.ShouldNotHaveAnyValidationErrors();
     }
 
+    [Fact]
+    public void Validate_BlankSortValues_IsValid()
+    {
+        var parameters = new RequestQueryParameters { Sort = [null!, "", " "] };
+
+        var result = _validator.TestValidate(parameters);
+
+        result.ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Fact]
+    public void ParseSort_OnlyBlankValues_ReturnsDefault()
+    {
+        var parameters = new RequestQueryParameters { Sort = ["", " "] };
+
+        var sorts = parameters.ParseSort();
+
+        Assert.Equal(new[] { RequestSort.Default }, sorts);
+    }
+
     [Theory]
     [InlineData("banana")]
     [InlineData("title:sideways")]
     [InlineData("2")]
     [InlineData("title:asc:desc")]
-    [InlineData("")]
+    [InlineData(":desc")]
     public void Validate_InvalidSortValue_HasSortItemError(string value)
     {
         var parameters = new RequestQueryParameters { Sort = ["createdAt", value] };

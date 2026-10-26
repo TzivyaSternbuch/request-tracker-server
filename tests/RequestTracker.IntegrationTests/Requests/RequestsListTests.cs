@@ -130,6 +130,34 @@ public sealed class RequestsListTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task GetPaged_PaddedTextFilters_AreTrimmed()
+    {
+        var prefix = NewPrefix();
+        await InsertAsync(factory,
+            New($"{prefix}-a", title: "printer report", assignedTo: "alice"),
+            New($"{prefix}-b", title: "printer report", assignedTo: "bob"),
+            New($"{prefix}-c", title: "other", assignedTo: "alice"));
+
+        var page = await GetPageAsync(_client,
+            $"organizationName=%20{prefix}%20&search=%20printer%20&assignedTo=%20alice%20");
+
+        Assert.Equal(new[] { $"{prefix}-a" }, page.Items.Select(r => r.OrganizationName));
+    }
+
+    [Fact]
+    public async Task GetPaged_BlankSort_UsesDefaultOrder()
+    {
+        var prefix = NewPrefix();
+        await InsertAsync(factory,
+            New(prefix, title: "old", createdAt: BaseTime),
+            New(prefix, title: "new", createdAt: BaseTime.AddDays(1)));
+
+        var page = await GetPageAsync(_client, $"organizationName={prefix}&sort=&sort=%20");
+
+        Assert.Equal(new[] { "new", "old" }, page.Items.Select(r => r.Title));
+    }
+
+    [Fact]
     public async Task GetPaged_PageBeyondEnd_ReturnsEmptyItemsWithTotalCount()
     {
         var prefix = NewPrefix();
@@ -188,6 +216,26 @@ public sealed class RequestsListTests(ApiFactory factory)
 
         Assert.Equal(ascending.Select(s => $"{prefix}-{s}"), asc.Items.Select(r => r.OrganizationName));
         Assert.Equal(ascending.Reverse().Select(s => $"{prefix}-{s}"), desc.Items.Select(r => r.OrganizationName));
+    }
+
+    // Inserted newest first, so Id order is the reverse of date order.
+    [Theory]
+    [InlineData("status")]
+    [InlineData("priority")]
+    [InlineData("assignedTo")]
+    public async Task GetPaged_SortByFieldIndexedWithCreatedAt_OrdersTiesByCreatedAt(string field)
+    {
+        var prefix = NewPrefix();
+        foreach (var (title, day) in new[] { ("new", 3), ("mid", 2), ("old", 1) })
+        {
+            await InsertAsync(factory, New(prefix, title: title, createdAt: BaseTime.AddDays(day)));
+        }
+
+        var asc = await GetPageAsync(_client, $"organizationName={prefix}&sort={field}:asc");
+        var desc = await GetPageAsync(_client, $"organizationName={prefix}&sort={field}:desc");
+
+        Assert.Equal(new[] { "old", "mid", "new" }, asc.Items.Select(r => r.Title));
+        Assert.Equal(new[] { "new", "mid", "old" }, desc.Items.Select(r => r.Title));
     }
 
     [Fact]
