@@ -6,4 +6,6 @@ namespace RequestTracker.Core.Abstractions;
 public interface IRequestRepository
 {
     Task<PagedResult<RequestDto>> GetPagedAsync(RequestQueryParameters parameters, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken);
 }
