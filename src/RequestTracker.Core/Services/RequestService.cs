@@ -15,4 +15,7 @@ public sealed class RequestService(
         await queryValidator.ValidateAndThrowAsync(parameters, cancellationToken);
         return await repository.GetPagedAsync(parameters, cancellationToken);
     }
+
+    public Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken) =>
+        repository.GetAssigneesAsync(cancellationToken);
 }

@@ -31,6 +31,15 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
         return new PagedResult<RequestDto>(items, parameters.Page, parameters.PageSize, totalCount);
     }
 
+    public async Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken)
+    {
+        return await db.Requests
+            .Select(r => r.AssignedTo)
+            .Distinct()
+            .OrderBy(a => a)
+            .ToListAsync(cancellationToken);
+    }
+
     private static IQueryable<Request> Filter(IQueryable<Request> query, RequestQueryParameters parameters)
     {
         if (parameters.Status.Length > 0)
