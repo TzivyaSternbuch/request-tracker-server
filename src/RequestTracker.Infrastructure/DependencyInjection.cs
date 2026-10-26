@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using RequestTracker.Core.Abstractions;
 using RequestTracker.Infrastructure.Persistence;
+using RequestTracker.Infrastructure.Repositories;
 using RequestTracker.Infrastructure.Seeding;
 
 namespace RequestTracker.Infrastructure;
@@ -13,6 +15,7 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("RequestTracker")
             ?? throw new InvalidOperationException("Connection string 'RequestTracker' is not configured.");
         services.AddDbContext<RequestTrackerDbContext>(options => options.UseSqlServer(connectionString));
+        services.AddScoped<IRequestRepository, RequestRepository>();
         services.AddScoped<DataSeeder>();
         return services;
     }
