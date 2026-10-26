@@ -30,6 +30,20 @@ public sealed class OpenApiTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task Get_OpenApiDocument_DescribesListResponses()
+    {
+        var response = await _client.GetAsync("/openapi/v1.json");
+
+        var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        var responses = document.GetProperty("paths").GetProperty("/api/requests").GetProperty("get")
+            .GetProperty("responses");
+        var okSchema = responses.GetProperty("200").GetProperty("content").GetProperty("application/json")
+            .GetProperty("schema").GetProperty("$ref").GetString();
+        Assert.Contains("PagedResult", okSchema);
+        Assert.True(responses.GetProperty("400").GetProperty("content").TryGetProperty("application/problem+json", out _));
+    }
+
+    [Fact]
     public async Task Get_SwaggerUi_Returns200()
     {
         var response = await _client.GetAsync("/swagger/index.html");

@@ -22,6 +22,8 @@ public class RequestConfiguration : IEntityTypeConfiguration<Request>
 
         // Each index ends in CreatedAt so a filtered list keeps the default sort without a sort step;
         // the clustered key Id is implicitly part of every index, which gives the tiebreaker order.
+        // RequestRepository.IndexedWithCreatedAt relies on the (Field, CreatedAt) layout below to sort
+        // status, priority and assignedTo from the index; change both together.
         builder.HasIndex(r => r.CreatedAt).HasDatabaseName("IX_Requests_CreatedAt");
         builder.HasIndex(r => new { r.Status, r.CreatedAt }).HasDatabaseName("IX_Requests_Status_CreatedAt");
         builder.HasIndex(r => new { r.Priority, r.CreatedAt }).HasDatabaseName("IX_Requests_Priority_CreatedAt");

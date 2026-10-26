@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -37,7 +36,7 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
     {
         // Keys use the JSON (camelCase) names, the same as model-binding errors.
         var errors = exception.Errors
-            .GroupBy(e => ToJsonPath(e.PropertyName))
+            .GroupBy(e => ErrorKeys.ToJsonPath(e.PropertyName))
             .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
 
         return new ValidationProblemDetails(errors)
@@ -47,11 +46,4 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
             Detail = errors.Count == 0 ? exception.Message : null,
         };
     }
-
-    // "Items[0].Version" → "items[0].version": every segment, not only the first character. A failure that
-    // isn't about one property goes under "", like model-level errors from model binding.
-    private static string ToJsonPath(string? propertyName) =>
-        string.IsNullOrEmpty(propertyName)
-            ? string.Empty
-            : string.Join('.', propertyName.Split('.').Select(JsonNamingPolicy.CamelCase.ConvertName));
 }

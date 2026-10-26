@@ -11,9 +11,10 @@ builder.Services.AddCore();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services
     .AddControllers(options =>
-        // Model-binding errors use the JSON (camelCase) property names, matching the request body.
         options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider()))
-    .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
+    .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions))
+    .ConfigureApiBehaviorOptions(options =>
+        options.InvalidModelStateResponseFactory = InvalidModelStateResponse.Create);
 // The OpenAPI document reads these options, not the MVC ones above; without them it describes enums as integers.
 builder.Services.ConfigureHttpJsonOptions(options => ConfigureJson(options.SerializerOptions));
 builder.Services.AddProblemDetails();

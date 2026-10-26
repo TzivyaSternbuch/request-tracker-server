@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RequestTracker.Core.Domain;
 using RequestTracker.Core.Entities;
 using RequestTracker.Infrastructure.Persistence;
+using RequestTracker.IntegrationTests.Requests;
 using RequestTracker.IntegrationTests.TestHost;
 
 namespace RequestTracker.IntegrationTests;
@@ -83,9 +84,9 @@ public sealed class SchemaTests(ApiFactory factory)
     public async Task SaveChanges_UndefinedStatus_ThrowsAndWritesNothing()
     {
         var marker = Guid.NewGuid().ToString();
-        var request = NewRequest(marker, status: (RequestStatus)7);
+        var request = TestRequests.New(marker, status: (RequestStatus)7);
 
-        var exception = await Assert.ThrowsAsync<DbUpdateException>(() => SaveAsync(request));
+        var exception = await Assert.ThrowsAsync<DbUpdateException>(() => TestRequests.InsertAsync(factory, request));
 
         Assert.Equal(CheckConstraintViolation, Assert.IsType<SqlException>(exception.InnerException).Number);
         Assert.False(await RequestExistsAsync(marker));
@@ -95,9 +96,9 @@ public sealed class SchemaTests(ApiFactory factory)
     public async Task SaveChanges_TitleOverMaxLength_ThrowsAndWritesNothing()
     {
         var marker = Guid.NewGuid().ToString();
-        var request = NewRequest(marker, title: new string('x', Request.TitleMaxLength + 1));
+        var request = TestRequests.New(marker, title: new string('x', Request.TitleMaxLength + 1));
 
-        var exception = await Assert.ThrowsAsync<DbUpdateException>(() => SaveAsync(request));
+        var exception = await Assert.ThrowsAsync<DbUpdateException>(() => TestRequests.InsertAsync(factory, request));
 
         Assert.Equal(StringTruncation, Assert.IsType<SqlException>(exception.InnerException).Number);
         Assert.False(await RequestExistsAsync(marker));
@@ -106,26 +107,8 @@ public sealed class SchemaTests(ApiFactory factory)
     private const int CheckConstraintViolation = 547;
     private const int StringTruncation = 2628;
 
-    // The marker goes in OrganizationName, so the existence check finds only this test's row.
-    private static Request NewRequest(string marker, RequestStatus status = RequestStatus.New, string title = "Title") =>
-        new()
-        {
-            Title = title,
-            OrganizationName = marker,
-            Status = status,
-            Priority = RequestPriority.Medium,
-            AssignedTo = "handler",
-            CreatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
-            UpdatedAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
-        };
+    // The marker is the row's OrganizationName, so the existence check finds only this test's row.
 
-    private async Task SaveAsync(Request request)
-    {
-        await using var scope = factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<RequestTrackerDbContext>();
-        db.Requests.Add(request);
-        await db.SaveChangesAsync();
-    }
 
     private async Task<bool> RequestExistsAsync(string marker)
     {

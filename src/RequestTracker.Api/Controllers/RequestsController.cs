@@ -1,0 +1,21 @@
+using Microsoft.AspNetCore.Mvc;
+using RequestTracker.Core.Dtos;
+using RequestTracker.Core.Models;
+using RequestTracker.Core.Services;
+
+namespace RequestTracker.Api.Controllers;
+
+[ApiController]
+[Route("api/requests")]
+public sealed class RequestsController(IRequestService service) : ControllerBase
+{
+    [HttpGet]
+    [ProducesResponseType<PagedResult<RequestDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    public async Task<ActionResult<PagedResult<RequestDto>>> GetPaged(
+        [FromQuery] RequestQueryParameters parameters, CancellationToken cancellationToken)
+    {
+        var result = await service.GetPagedAsync(parameters, cancellationToken);
+        return Ok(result);
+    }
+}
