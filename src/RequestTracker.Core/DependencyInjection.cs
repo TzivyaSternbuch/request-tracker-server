@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddHybridCache();
 
         services.AddScoped<IValidator<RequestQueryParameters>, RequestQueryParametersValidator>();
+        services.AddScoped<IValidator<UpdateStatusRequest>, UpdateStatusRequestValidator>();
         services.AddScoped<IRequestService, RequestService>();
 
         return services;
