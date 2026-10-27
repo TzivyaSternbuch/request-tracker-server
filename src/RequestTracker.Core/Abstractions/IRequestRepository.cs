@@ -10,6 +10,9 @@ public interface IRequestRepository
 
     Task<RequestDto?> GetByIdAsync(int id, CancellationToken cancellationToken);
 
+    Task<PagedResult<StatusHistoryDto>> GetHistoryAsync(
+        int requestId, StatusHistoryQueryParameters parameters, CancellationToken cancellationToken);
+
     Task<UpdateStatusResult> TryUpdateStatusAsync(
         int id,
         byte[] expectedVersion,

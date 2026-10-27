@@ -95,7 +95,7 @@ internal static class TestRequests
         return (await response.Content.ReadFromJsonAsync<RequestDto>(JsonOptions))!;
     }
 
-    // Reads the table directly: the history endpoint comes in task 12.
+    // Reads the table directly, to check the audit rows themselves rather than what the history endpoint returns.
     public static async Task<List<RequestStatusHistory>> GetHistoryAsync(ApiFactory factory, int requestId)
     {
         await using var scope = factory.Services.CreateAsyncScope();

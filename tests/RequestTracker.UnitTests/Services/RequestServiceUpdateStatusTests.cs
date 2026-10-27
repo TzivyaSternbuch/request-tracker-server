@@ -30,6 +30,7 @@ public sealed class RequestServiceUpdateStatusTests
             _repository,
             new RequestQueryParametersValidator(),
             new UpdateStatusRequestValidator(),
+            new StatusHistoryQueryParametersValidator(),
             _cache,
             new FakeServiceScopeFactory(_repository),
             new FixedTimeProvider(Now),

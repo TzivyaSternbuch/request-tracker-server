@@ -15,6 +15,7 @@ public static class DependencyInjection
 
         services.AddScoped<IValidator<RequestQueryParameters>, RequestQueryParametersValidator>();
         services.AddScoped<IValidator<UpdateStatusRequest>, UpdateStatusRequestValidator>();
+        services.AddScoped<IValidator<StatusHistoryQueryParameters>, StatusHistoryQueryParametersValidator>();
         services.AddScoped<IRequestService, RequestService>();
 
         return services;

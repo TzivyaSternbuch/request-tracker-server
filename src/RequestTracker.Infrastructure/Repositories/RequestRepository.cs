@@ -44,6 +44,24 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<PagedResult<StatusHistoryDto>> GetHistoryAsync(
+        int requestId, StatusHistoryQueryParameters parameters, CancellationToken cancellationToken)
+    {
+        var query = db.RequestStatusHistory.AsNoTracking().Where(h => h.RequestId == requestId);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(h => h.ChangedAt)
+            .ThenByDescending(h => h.Id)
+            .Skip((parameters.Page - 1) * parameters.PageSize)
+            .Take(parameters.PageSize)
+            .Select(StatusHistoryMapping.ToDto)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<StatusHistoryDto>(items, parameters.Page, parameters.PageSize, totalCount);
+    }
+
     public async Task<UpdateStatusResult> TryUpdateStatusAsync(
         int id,
         byte[] expectedVersion,

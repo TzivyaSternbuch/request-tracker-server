@@ -44,6 +44,12 @@ public sealed class FakeRequestRepository(List<string> calls) : IRequestReposito
         throw new NotSupportedException();
     }
 
+    public Task<PagedResult<StatusHistoryDto>> GetHistoryAsync(
+        int requestId, StatusHistoryQueryParameters parameters, CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     public Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken)
     {
         throw new NotSupportedException();
