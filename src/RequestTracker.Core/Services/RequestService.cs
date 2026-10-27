@@ -89,4 +89,7 @@ public sealed class RequestService(
         logger.LogWarning("Status update conflict for {RequestId}", id);
         return new ConcurrencyConflictException($"Request {id} was modified by someone else.");
     }
+
+    public Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken) =>
+        repository.GetAssigneesAsync(cancellationToken);
 }

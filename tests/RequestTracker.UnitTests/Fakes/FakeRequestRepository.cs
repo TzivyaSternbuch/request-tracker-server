@@ -19,6 +19,11 @@ public sealed class FakeRequestRepository(List<string> calls) : IRequestReposito
         throw new NotSupportedException();
     }
 
+    public Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken)
+    {
+        throw new NotSupportedException();
+    }
+
     public Task<RequestDto?> GetByIdAsync(int id, CancellationToken cancellationToken)
     {
         return Task.FromResult(Current);

@@ -40,4 +40,12 @@ public sealed class RequestsController(IRequestService service) : ControllerBase
         var result = await service.UpdateStatusAsync(id, request, cancellationToken);
         return Ok(result);
     }
+
+    [HttpGet("assignees")]
+    [ProducesResponseType<IReadOnlyList<string>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<string>>> GetAssignees(CancellationToken cancellationToken)
+    {
+        var result = await service.GetAssigneesAsync(cancellationToken);
+        return Ok(result);
+    }
 }

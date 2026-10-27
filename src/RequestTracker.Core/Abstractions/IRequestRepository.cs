@@ -18,4 +18,6 @@ public interface IRequestRepository
         string changedBy,
         DateTimeOffset changedAt,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken);
 }
