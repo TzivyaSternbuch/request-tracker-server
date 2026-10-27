@@ -11,4 +11,7 @@ public record RequestDto(
     string AssignedTo,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    byte[] Version);
+    byte[] Version)
+{
+    public IReadOnlyList<RequestStatus> AllowedStatuses => StatusTransitions.AllowedFrom(Status);
+}
