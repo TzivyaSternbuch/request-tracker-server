@@ -66,6 +66,28 @@ public sealed class FakeRequestRepository(List<string> calls) : IRequestReposito
         return Task.FromResult(Current);
     }
 
+    // For bulk tests: the rows GetByIdsAsync finds, and per-id write results (NextResult for ids not listed).
+    public Dictionary<int, RequestDto> Rows { get; } = [];
+
+    public Dictionary<int, UpdateStatusResult> ResultsById { get; } = [];
+
+    public List<TryUpdateStatusCall> UpdateCalls { get; } = [];
+
+    public int GetByIdsCalls { get; private set; }
+
+    // Runs before each write, to simulate a failure partway through a bulk update.
+    public Action<int>? OnTryUpdate { get; set; }
+
+    public Task<IReadOnlyDictionary<int, RequestDto>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids, CancellationToken cancellationToken)
+    {
+        GetByIdsCalls++;
+        IReadOnlyDictionary<int, RequestDto> found = Rows
+            .Where(r => ids.Contains(r.Key))
+            .ToDictionary(r => r.Key, r => r.Value);
+        return Task.FromResult(found);
+    }
+
     public Task<UpdateStatusResult> TryUpdateStatusAsync(
         int id,
         byte[] expectedVersion,
@@ -75,8 +97,10 @@ public sealed class FakeRequestRepository(List<string> calls) : IRequestReposito
         DateTimeOffset changedAt,
         CancellationToken cancellationToken)
     {
+        OnTryUpdate?.Invoke(id);
         calls.Add("TryUpdateStatus");
         LastUpdateCall = new TryUpdateStatusCall(id, expectedVersion, previousStatus, newStatus, changedBy, changedAt);
-        return Task.FromResult(NextResult);
+        UpdateCalls.Add(LastUpdateCall);
+        return Task.FromResult(ResultsById.GetValueOrDefault(id, NextResult));
     }
 }

@@ -44,6 +44,15 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyDictionary<int, RequestDto>> GetByIdsAsync(
+        IReadOnlyCollection<int> ids, CancellationToken cancellationToken)
+    {
+        return await db.Requests.AsNoTracking()
+            .Where(r => ids.Contains(r.Id))
+            .Select(RequestMapping.ToDto)
+            .ToDictionaryAsync(r => r.Id, cancellationToken);
+    }
+
     public async Task<PagedResult<StatusHistoryDto>> GetHistoryAsync(
         int requestId, StatusHistoryQueryParameters parameters, CancellationToken cancellationToken)
     {
