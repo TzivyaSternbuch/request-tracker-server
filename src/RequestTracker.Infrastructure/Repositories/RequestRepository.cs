@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using RequestTracker.Core.Abstractions;
+using RequestTracker.Core.Domain;
 using RequestTracker.Core.Dtos;
 using RequestTracker.Core.Entities;
 using RequestTracker.Core.Mapping;
@@ -37,6 +38,18 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
             .Where(r => r.Id == id)
             .Select(RequestMapping.ToDto)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<UpdateStatusResult> TryUpdateStatusAsync(
+        int id,
+        byte[] expectedVersion,
+        RequestStatus previousStatus,
+        RequestStatus newStatus,
+        string changedBy,
+        DateTimeOffset changedAt,
+        CancellationToken cancellationToken)
+    {
+        throw new NotImplementedException();
     }
 
     private static IQueryable<Request> Filter(IQueryable<Request> query, RequestQueryParameters parameters)
