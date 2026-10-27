@@ -31,6 +31,7 @@ public sealed class RequestServiceUpdateStatusTests
             new RequestQueryParametersValidator(),
             new UpdateStatusRequestValidator(),
             _cache,
+            new FakeServiceScopeFactory(_repository),
             new FixedTimeProvider(Now),
             _logger);
     }

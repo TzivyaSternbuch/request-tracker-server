@@ -54,6 +54,8 @@ internal static class TestRequests
     }
 
     // For tests of global figures (statistics): history first, its foreign key restricts deleting the requests.
+    // Deletes every row in the shared database, so it is only safe because all integration test classes belong to
+    // ApiCollection, whose tests run one at a time. A class outside that collection could lose its rows mid-test.
     public static async Task ClearAsync(ApiFactory factory)
     {
         await using var scope = factory.Services.CreateAsyncScope();

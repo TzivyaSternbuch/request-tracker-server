@@ -1,5 +1,6 @@
 using FluentValidation;
 using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RequestTracker.Core.Abstractions;
 using RequestTracker.Core.Caching;
@@ -15,6 +16,7 @@ public sealed class RequestService(
     IValidator<RequestQueryParameters> queryValidator,
     IValidator<UpdateStatusRequest> updateStatusValidator,
     HybridCache cache,
+    IServiceScopeFactory scopeFactory,
     TimeProvider timeProvider,
     ILogger<RequestService> logger) : IRequestService
 {
@@ -74,8 +76,7 @@ public sealed class RequestService(
         }
 
         // Only after the committed write: invalidating earlier lets a concurrent read re-cache the old stats.
-        // Not cancellable: the update is committed, so a client disconnect here would leave stale stats.
-        await cache.RemoveByTagAsync(CacheKeys.StatsTag, CancellationToken.None);
+        await InvalidateStatsAsync();
         return result.Request!;
     }
 
@@ -95,15 +96,42 @@ public sealed class RequestService(
 
     public async Task<RequestStatsDto> GetStatsAsync(CancellationToken cancellationToken)
     {
+        var invalidationsBefore = Volatile.Read(ref s_statsInvalidations);
+
         // One global entry. HybridCache runs the factory once for concurrent misses, which matters because every
-        // status update empties the entry.
-        return await cache.GetOrCreateAsync(
+        // status update empties the entry. That one run can outlive the request that started it, so it gets its own
+        // scope (and DbContext) instead of this request's repository, which is disposed when the request ends.
+        var stats = await cache.GetOrCreateAsync(
             CacheKeys.Stats,
-            (repository, timeProvider),
-            static (state, ct) => new ValueTask<RequestStatsDto>(
-                state.repository.GetStatsAsync(state.timeProvider.GetUtcNow(), ct)),
+            (scopeFactory, timeProvider),
+            static async (state, ct) =>
+            {
+                await using var scope = state.scopeFactory.CreateAsyncScope();
+                var statsRepository = scope.ServiceProvider.GetRequiredService<IRequestRepository>();
+                return await statsRepository.GetStatsAsync(state.timeProvider.GetUtcNow(), ct);
+            },
             new HybridCacheEntryOptions { Expiration = CacheKeys.StatsLifetime },
             [CacheKeys.StatsTag],
             cancellationToken);
+
+        // An update that committed while these figures were computed has already removed the tag, before this entry
+        // existed, and HybridCache would serve the entry as fresh. Removing the tag again makes the next read recompute.
+        if (Volatile.Read(ref s_statsInvalidations) != invalidationsBefore)
+        {
+            await cache.RemoveByTagAsync(CacheKeys.StatsTag, CancellationToken.None);
+        }
+
+        return stats;
+    }
+
+    // Counts invalidations in this process, like the in-memory cache it guards.
+    private static long s_statsInvalidations;
+
+    private async Task InvalidateStatsAsync()
+    {
+        Interlocked.Increment(ref s_statsInvalidations);
+
+        // Not cancellable: the update is committed, so a client disconnect here would leave stale stats.
+        await cache.RemoveByTagAsync(CacheKeys.StatsTag, CancellationToken.None);
     }
 }

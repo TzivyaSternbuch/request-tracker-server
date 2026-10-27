@@ -21,13 +21,21 @@ public sealed class FakeRequestRepository(List<string> calls) : IRequestReposito
 
     public int StatsCalls { get; private set; }
 
+    // Runs while the statistics are being computed, to simulate an update committing at that moment.
+    public Func<Task>? DuringStats { get; set; }
+
     public DateTimeOffset? LastStatsAsOf { get; private set; }
 
-    public Task<RequestStatsDto> GetStatsAsync(DateTimeOffset asOf, CancellationToken cancellationToken)
+    public async Task<RequestStatsDto> GetStatsAsync(DateTimeOffset asOf, CancellationToken cancellationToken)
     {
         StatsCalls++;
         LastStatsAsOf = asOf;
-        return Task.FromResult(Stats);
+        if (DuringStats is not null)
+        {
+            await DuringStats();
+        }
+
+        return Stats;
     }
 
     public Task<PagedResult<RequestDto>> GetPagedAsync(

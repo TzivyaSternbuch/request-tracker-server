@@ -43,6 +43,7 @@ public sealed class RequestsController(IRequestService service) : ControllerBase
 
     [HttpGet("stats")]
     [ProducesResponseType<RequestStatsDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError, "application/problem+json")]
     public async Task<ActionResult<RequestStatsDto>> GetStats(CancellationToken cancellationToken)
     {
         var result = await service.GetStatsAsync(cancellationToken);

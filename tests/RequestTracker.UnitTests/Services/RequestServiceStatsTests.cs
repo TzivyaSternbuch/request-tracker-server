@@ -1,4 +1,7 @@
 using RequestTracker.Core.Caching;
+using RequestTracker.Core.Domain;
+using RequestTracker.Core.Dtos;
+using RequestTracker.Core.Models;
 using RequestTracker.Core.Services;
 using RequestTracker.Core.Validation;
 using RequestTracker.UnitTests.Fakes;
@@ -23,6 +26,7 @@ public sealed class RequestServiceStatsTests
             new RequestQueryParametersValidator(),
             new UpdateStatusRequestValidator(),
             _cache,
+            new FakeServiceScopeFactory(_repository),
             new FixedTimeProvider(Now),
             new CapturingLogger<RequestService>());
     }
@@ -54,6 +58,26 @@ public sealed class RequestServiceStatsTests
         await _service.GetStatsAsync(CancellationToken.None);
         await _cache.RemoveByTagAsync(CacheKeys.StatsTag);
 
+        await _service.GetStatsAsync(CancellationToken.None);
+
+        Assert.Equal(2, _repository.StatsCalls);
+    }
+
+    [Fact]
+    public async Task GetStatsAsync_UpdateCommitsWhileComputing_NextCallRecomputes()
+    {
+        byte[] version = [1, 2, 3, 4, 5, 6, 7, 8];
+        var row = new RequestDto(
+            1, "Title", "Org", RequestStatus.New, RequestPriority.Medium, "alice", Now, Now, version);
+        _repository.Current = row;
+        _repository.NextResult = new UpdateStatusResult(UpdateStatusOutcome.Updated, row);
+        _repository.DuringStats = () => _service.UpdateStatusAsync(
+            row.Id,
+            new UpdateStatusRequest { Status = RequestStatus.InProgress, Version = version, ChangedBy = "bob" },
+            CancellationToken.None);
+
+        await _service.GetStatsAsync(CancellationToken.None);
+        _repository.DuringStats = null;
         await _service.GetStatsAsync(CancellationToken.None);
 
         Assert.Equal(2, _repository.StatsCalls);
