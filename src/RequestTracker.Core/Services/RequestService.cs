@@ -55,14 +55,14 @@ public sealed class RequestService(
         var result = await ChangeStatusAsync(
             id, current, request.Version!, newStatus, request.ChangedBy!.Trim(), cancellationToken);
 
-        switch (result.Outcome)
+        switch (result.Failure)
         {
-            case StatusChangeOutcome.NotFound:
+            case BulkFailureReason.NotFound:
                 throw NotFound(id);
-            case StatusChangeOutcome.Conflict:
+            case BulkFailureReason.Conflict:
                 logger.LogWarning("Status update conflict for {RequestId}", id);
                 throw new ConcurrencyConflictException($"Request {id} was modified by someone else.");
-            case StatusChangeOutcome.InvalidTransition:
+            case BulkFailureReason.InvalidTransition:
                 throw new InvalidStatusTransitionException(
                     $"Cannot change status from {current!.Status} to {newStatus}.");
         }
@@ -92,13 +92,13 @@ public sealed class RequestService(
                 var result = await ChangeStatusAsync(
                     id, current.GetValueOrDefault(id), item.Version!, newStatus, changedBy, cancellationToken);
 
-                if (result.Outcome == StatusChangeOutcome.Updated)
+                if (result.Failure is not { } failure)
                 {
                     succeeded.Add(id);
                 }
                 else
                 {
-                    failed.Add(new BulkFailureDto(id, ToFailureReason(result.Outcome)));
+                    failed.Add(new BulkFailureDto(id, failure));
                 }
             }
         }
@@ -131,18 +131,18 @@ public sealed class RequestService(
     {
         if (current is null)
         {
-            return new StatusChangeResult(StatusChangeOutcome.NotFound, null);
+            return new StatusChangeResult(BulkFailureReason.NotFound, null);
         }
 
         // A stale client gets a conflict even when its transition is also invalid: it must reload before anything else.
         if (!current.Version.SequenceEqual(expectedVersion))
         {
-            return new StatusChangeResult(StatusChangeOutcome.Conflict, null);
+            return new StatusChangeResult(BulkFailureReason.Conflict, null);
         }
 
         if (!StatusTransitions.IsAllowed(current.Status, newStatus))
         {
-            return new StatusChangeResult(StatusChangeOutcome.InvalidTransition, null);
+            return new StatusChangeResult(BulkFailureReason.InvalidTransition, null);
         }
 
         var result = await repository.TryUpdateStatusAsync(
@@ -156,29 +156,14 @@ public sealed class RequestService(
 
         return result.Outcome switch
         {
-            UpdateStatusOutcome.NotFound => new StatusChangeResult(StatusChangeOutcome.NotFound, null),
-            UpdateStatusOutcome.Conflict => new StatusChangeResult(StatusChangeOutcome.Conflict, null),
-            _ => new StatusChangeResult(StatusChangeOutcome.Updated, result.Request),
+            UpdateStatusOutcome.NotFound => new StatusChangeResult(BulkFailureReason.NotFound, null),
+            UpdateStatusOutcome.Conflict => new StatusChangeResult(BulkFailureReason.Conflict, null),
+            _ => new StatusChangeResult(null, result.Request),
         };
     }
 
-    private static BulkFailureReason ToFailureReason(StatusChangeOutcome outcome) => outcome switch
-    {
-        StatusChangeOutcome.NotFound => BulkFailureReason.NotFound,
-        StatusChangeOutcome.Conflict => BulkFailureReason.Conflict,
-        _ => BulkFailureReason.InvalidTransition,
-    };
-
-    private enum StatusChangeOutcome
-    {
-        Updated,
-        NotFound,
-        Conflict,
-        InvalidTransition,
-    }
-
-    // Request is set only when Outcome is Updated.
-    private sealed record StatusChangeResult(StatusChangeOutcome Outcome, RequestDto? Request);
+    // Failure is null when the status was changed; Request is set only then.
+    private sealed record StatusChangeResult(BulkFailureReason? Failure, RequestDto? Request);
 
     private static NotFoundException NotFound(int id)
     {
