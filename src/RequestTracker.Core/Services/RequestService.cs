@@ -92,4 +92,18 @@ public sealed class RequestService(
 
     public Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken) =>
         repository.GetAssigneesAsync(cancellationToken);
+
+    public async Task<RequestStatsDto> GetStatsAsync(CancellationToken cancellationToken)
+    {
+        // One global entry. HybridCache runs the factory once for concurrent misses, which matters because every
+        // status update empties the entry.
+        return await cache.GetOrCreateAsync(
+            CacheKeys.Stats,
+            (repository, timeProvider),
+            static (state, ct) => new ValueTask<RequestStatsDto>(
+                state.repository.GetStatsAsync(state.timeProvider.GetUtcNow(), ct)),
+            new HybridCacheEntryOptions { Expiration = CacheKeys.StatsLifetime },
+            [CacheKeys.StatsTag],
+            cancellationToken);
+    }
 }

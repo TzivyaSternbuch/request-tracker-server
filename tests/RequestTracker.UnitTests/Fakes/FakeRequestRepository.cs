@@ -13,6 +13,23 @@ public sealed class FakeRequestRepository(List<string> calls) : IRequestReposito
 
     public TryUpdateStatusCall? LastUpdateCall { get; private set; }
 
+    public RequestStatsDto Stats { get; set; } = new(
+        DateTimeOffset.MinValue,
+        new Dictionary<RequestStatus, int>(),
+        new OpenRequestAgeDto(0, 0, 0),
+        []);
+
+    public int StatsCalls { get; private set; }
+
+    public DateTimeOffset? LastStatsAsOf { get; private set; }
+
+    public Task<RequestStatsDto> GetStatsAsync(DateTimeOffset asOf, CancellationToken cancellationToken)
+    {
+        StatsCalls++;
+        LastStatsAsOf = asOf;
+        return Task.FromResult(Stats);
+    }
+
     public Task<PagedResult<RequestDto>> GetPagedAsync(
         RequestQueryParameters parameters, CancellationToken cancellationToken)
     {

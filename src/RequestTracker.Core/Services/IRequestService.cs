@@ -12,4 +12,6 @@ public interface IRequestService
     Task<RequestDto> UpdateStatusAsync(int id, UpdateStatusRequest request, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken);
+
+    Task<RequestStatsDto> GetStatsAsync(CancellationToken cancellationToken);
 }
