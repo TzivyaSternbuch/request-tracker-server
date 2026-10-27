@@ -20,6 +20,7 @@ public sealed class RequestServiceHistoryTests
             _repository,
             new RequestQueryParametersValidator(),
             new UpdateStatusRequestValidator(),
+            new BulkUpdateStatusRequestValidator(),
             new StatusHistoryQueryParametersValidator(),
             new FakeHybridCache(_calls),
             new FakeServiceScopeFactory(_repository),

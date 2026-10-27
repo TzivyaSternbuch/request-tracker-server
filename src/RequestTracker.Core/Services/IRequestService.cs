@@ -11,6 +11,9 @@ public interface IRequestService
 
     Task<RequestDto> UpdateStatusAsync(int id, UpdateStatusRequest request, CancellationToken cancellationToken);
 
+    Task<BulkUpdateStatusResultDto> BulkUpdateStatusAsync(
+        BulkUpdateStatusRequest request, CancellationToken cancellationToken);
+
     Task<PagedResult<StatusHistoryDto>> GetHistoryAsync(
         int requestId, StatusHistoryQueryParameters parameters, CancellationToken cancellationToken);
 

@@ -41,6 +41,17 @@ public sealed class RequestsController(IRequestService service) : ControllerBase
         return Ok(result);
     }
 
+    // Always 200 for a valid request, even when every item failed: the outcome of each item is in the body.
+    [HttpPatch("bulk-status")]
+    [ProducesResponseType<BulkUpdateStatusResultDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    public async Task<ActionResult<BulkUpdateStatusResultDto>> BulkUpdateStatus(
+        BulkUpdateStatusRequest request, CancellationToken cancellationToken)
+    {
+        var result = await service.BulkUpdateStatusAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("{id:int}/history")]
     [ProducesResponseType<PagedResult<StatusHistoryDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]

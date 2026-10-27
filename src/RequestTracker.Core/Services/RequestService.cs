@@ -15,6 +15,7 @@ public sealed class RequestService(
     IRequestRepository repository,
     IValidator<RequestQueryParameters> queryValidator,
     IValidator<UpdateStatusRequest> updateStatusValidator,
+    IValidator<BulkUpdateStatusRequest> bulkUpdateStatusValidator,
     IValidator<StatusHistoryQueryParameters> historyValidator,
     HybridCache cache,
     IServiceScopeFactory scopeFactory,
@@ -46,41 +47,24 @@ public sealed class RequestService(
     {
         await updateStatusValidator.ValidateAndThrowAsync(request, cancellationToken);
         var newStatus = request.Status!.Value;
-        var expectedVersion = request.Version!;
 
         // This read only validates the transition and supplies PreviousStatus for the audit row. It does not prevent
-        // lost updates: the row can change after it. The conditional update on the version below does that.
-        var current = await repository.GetByIdAsync(id, cancellationToken) ?? throw NotFound(id);
+        // lost updates: the row can change after it. The conditional update on the version does that.
+        var current = await repository.GetByIdAsync(id, cancellationToken);
 
-        // A stale client gets 409 even when its transition is also invalid: it must reload before anything else.
-        if (!current.Version.SequenceEqual(expectedVersion))
+        var result = await ChangeStatusAsync(
+            id, current, request.Version!, newStatus, request.ChangedBy!.Trim(), cancellationToken);
+
+        switch (result.Outcome)
         {
-            throw Conflict(id);
-        }
-
-        if (!StatusTransitions.IsAllowed(current.Status, newStatus))
-        {
-            throw new InvalidStatusTransitionException(
-                $"Cannot change status from {current.Status} to {newStatus}.");
-        }
-
-        var result = await repository.TryUpdateStatusAsync(
-            id,
-            expectedVersion,
-            current.Status,
-            newStatus,
-            request.ChangedBy!.Trim(),
-            timeProvider.GetUtcNow(),
-            cancellationToken);
-
-        if (result.Outcome == UpdateStatusOutcome.NotFound)
-        {
-            throw NotFound(id);
-        }
-
-        if (result.Outcome == UpdateStatusOutcome.Conflict)
-        {
-            throw Conflict(id);
+            case StatusChangeOutcome.NotFound:
+                throw NotFound(id);
+            case StatusChangeOutcome.Conflict:
+                logger.LogWarning("Status update conflict for {RequestId}", id);
+                throw new ConcurrencyConflictException($"Request {id} was modified by someone else.");
+            case StatusChangeOutcome.InvalidTransition:
+                throw new InvalidStatusTransitionException(
+                    $"Cannot change status from {current!.Status} to {newStatus}.");
         }
 
         // Only after the committed write: invalidating earlier lets a concurrent read re-cache the old stats.
@@ -88,15 +72,117 @@ public sealed class RequestService(
         return result.Request!;
     }
 
+    public async Task<BulkUpdateStatusResultDto> BulkUpdateStatusAsync(
+        BulkUpdateStatusRequest request, CancellationToken cancellationToken)
+    {
+        await bulkUpdateStatusValidator.ValidateAndThrowAsync(request, cancellationToken);
+        var newStatus = request.Status!.Value;
+        var changedBy = request.ChangedBy!.Trim();
+        var items = request.Items!;
+
+        var current = await repository.GetByIdsAsync(items.Select(i => i.Id!.Value).ToList(), cancellationToken);
+
+        var succeeded = new List<int>();
+        var failed = new List<BulkFailureDto>();
+        try
+        {
+            foreach (var item in items)
+            {
+                var id = item.Id!.Value;
+                var result = await ChangeStatusAsync(
+                    id, current.GetValueOrDefault(id), item.Version!, newStatus, changedBy, cancellationToken);
+
+                if (result.Outcome == StatusChangeOutcome.Updated)
+                {
+                    succeeded.Add(id);
+                }
+                else
+                {
+                    failed.Add(new BulkFailureDto(id, ToFailureReason(result.Outcome)));
+                }
+            }
+        }
+        finally
+        {
+            if (succeeded.Count > 0)
+            {
+                await InvalidateStatsAsync();
+            }
+        }
+
+        // Counts only: ids and changedBy stay out of the log.
+        logger.LogInformation(
+            "Bulk status update: {Succeeded} succeeded, {NotFound} not found, {Conflict} conflicts, {InvalidTransition} invalid transitions",
+            succeeded.Count,
+            failed.Count(f => f.Reason == BulkFailureReason.NotFound),
+            failed.Count(f => f.Reason == BulkFailureReason.Conflict),
+            failed.Count(f => f.Reason == BulkFailureReason.InvalidTransition));
+
+        return new BulkUpdateStatusResultDto(succeeded, failed);
+    }
+
+    private async Task<StatusChangeResult> ChangeStatusAsync(
+        int id,
+        RequestDto? current,
+        byte[] expectedVersion,
+        RequestStatus newStatus,
+        string changedBy,
+        CancellationToken cancellationToken)
+    {
+        if (current is null)
+        {
+            return new StatusChangeResult(StatusChangeOutcome.NotFound, null);
+        }
+
+        // A stale client gets a conflict even when its transition is also invalid: it must reload before anything else.
+        if (!current.Version.SequenceEqual(expectedVersion))
+        {
+            return new StatusChangeResult(StatusChangeOutcome.Conflict, null);
+        }
+
+        if (!StatusTransitions.IsAllowed(current.Status, newStatus))
+        {
+            return new StatusChangeResult(StatusChangeOutcome.InvalidTransition, null);
+        }
+
+        var result = await repository.TryUpdateStatusAsync(
+            id,
+            expectedVersion,
+            current.Status,
+            newStatus,
+            changedBy,
+            timeProvider.GetUtcNow(),
+            cancellationToken);
+
+        return result.Outcome switch
+        {
+            UpdateStatusOutcome.NotFound => new StatusChangeResult(StatusChangeOutcome.NotFound, null),
+            UpdateStatusOutcome.Conflict => new StatusChangeResult(StatusChangeOutcome.Conflict, null),
+            _ => new StatusChangeResult(StatusChangeOutcome.Updated, result.Request),
+        };
+    }
+
+    private static BulkFailureReason ToFailureReason(StatusChangeOutcome outcome) => outcome switch
+    {
+        StatusChangeOutcome.NotFound => BulkFailureReason.NotFound,
+        StatusChangeOutcome.Conflict => BulkFailureReason.Conflict,
+        _ => BulkFailureReason.InvalidTransition,
+    };
+
+    private enum StatusChangeOutcome
+    {
+        Updated,
+        NotFound,
+        Conflict,
+        InvalidTransition,
+    }
+
+    // Request is set only when Outcome is Updated.
+    private sealed record StatusChangeResult(StatusChangeOutcome Outcome, RequestDto? Request);
+
     private static NotFoundException NotFound(int id)
     {
         return new NotFoundException($"Request {id} was not found.");
-    }
-
-    private ConcurrencyConflictException Conflict(int id)
-    {
-        logger.LogWarning("Status update conflict for {RequestId}", id);
-        return new ConcurrencyConflictException($"Request {id} was modified by someone else.");
     }
 
     public Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken) =>
