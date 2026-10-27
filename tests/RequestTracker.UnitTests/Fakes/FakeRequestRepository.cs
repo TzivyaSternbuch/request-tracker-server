@@ -44,6 +44,18 @@ public sealed class FakeRequestRepository(List<string> calls) : IRequestReposito
         throw new NotSupportedException();
     }
 
+    public PagedResult<StatusHistoryDto> NextHistory { get; set; } = new([], 1, 10, 0);
+
+    public (int RequestId, StatusHistoryQueryParameters Parameters)? LastHistoryCall { get; private set; }
+
+    public Task<PagedResult<StatusHistoryDto>> GetHistoryAsync(
+        int requestId, StatusHistoryQueryParameters parameters, CancellationToken cancellationToken)
+    {
+        calls.Add("GetHistory");
+        LastHistoryCall = (requestId, parameters);
+        return Task.FromResult(NextHistory);
+    }
+
     public Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken)
     {
         throw new NotSupportedException();

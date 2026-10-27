@@ -2,17 +2,9 @@ using RequestTracker.Core.Domain;
 
 namespace RequestTracker.Core.Models;
 
-public record RequestQueryParameters
+public record RequestQueryParameters : PagedQueryParameters
 {
-    public const int DefaultPageSize = 20;
-    public const int MaxPageSize = 100;
-
-    public const int MaxPage = int.MaxValue / MaxPageSize;
-
     public const int MaxFilterValues = 50;
-
-    public int Page { get; init; } = 1;
-    public int PageSize { get; init; } = DefaultPageSize;
 
     public RequestStatus[] Status { get; init; } = [];
     public RequestPriority[] Priority { get; init; } = [];

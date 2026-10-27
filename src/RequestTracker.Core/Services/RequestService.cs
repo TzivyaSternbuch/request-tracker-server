@@ -15,6 +15,7 @@ public sealed class RequestService(
     IRequestRepository repository,
     IValidator<RequestQueryParameters> queryValidator,
     IValidator<UpdateStatusRequest> updateStatusValidator,
+    IValidator<StatusHistoryQueryParameters> historyValidator,
     HybridCache cache,
     IServiceScopeFactory scopeFactory,
     TimeProvider timeProvider,
@@ -31,6 +32,13 @@ public sealed class RequestService(
     {
         var request = await repository.GetByIdAsync(id, cancellationToken);
         return request ?? throw NotFound(id);
+    }
+
+    public async Task<PagedResult<StatusHistoryDto>> GetHistoryAsync(
+        int requestId, StatusHistoryQueryParameters parameters, CancellationToken cancellationToken)
+    {
+        await historyValidator.ValidateAndThrowAsync(parameters, cancellationToken);
+        return await repository.GetHistoryAsync(requestId, parameters, cancellationToken);
     }
 
     public async Task<RequestDto> UpdateStatusAsync(

@@ -41,6 +41,16 @@ public sealed class RequestsController(IRequestService service) : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("{id:int}/history")]
+    [ProducesResponseType<PagedResult<StatusHistoryDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    public async Task<ActionResult<PagedResult<StatusHistoryDto>>> GetHistory(
+        int id, [FromQuery] StatusHistoryQueryParameters parameters, CancellationToken cancellationToken)
+    {
+        var result = await service.GetHistoryAsync(id, parameters, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("stats")]
     [ProducesResponseType<RequestStatsDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError, "application/problem+json")]

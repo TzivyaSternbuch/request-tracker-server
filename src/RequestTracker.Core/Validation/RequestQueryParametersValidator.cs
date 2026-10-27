@@ -4,13 +4,10 @@ using RequestTracker.Core.Models;
 
 namespace RequestTracker.Core.Validation;
 
-public sealed class RequestQueryParametersValidator : AbstractValidator<RequestQueryParameters>
+public sealed class RequestQueryParametersValidator : PagedQueryValidator<RequestQueryParameters>
 {
     public RequestQueryParametersValidator()
     {
-        RuleFor(p => p.Page).InclusiveBetween(1, RequestQueryParameters.MaxPage);
-        RuleFor(p => p.PageSize).InclusiveBetween(1, RequestQueryParameters.MaxPageSize);
-
         RuleFor(p => p.Status.Length).LessThanOrEqualTo(RequestQueryParameters.MaxFilterValues).OverridePropertyName("Status");
         RuleForEach(p => p.Status).IsInEnum();
         RuleFor(p => p.Priority.Length).LessThanOrEqualTo(RequestQueryParameters.MaxFilterValues).OverridePropertyName("Priority");
