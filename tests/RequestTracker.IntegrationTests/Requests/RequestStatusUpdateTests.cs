@@ -26,7 +26,7 @@ public sealed class RequestStatusUpdateTests(ApiFactory factory)
         Assert.NotEqual(before.Version, body.Version);
         var after = await GetRequestAsync(_client, entity.Id);
         Assert.Equal(after.Version, body.Version);
-        var history = Assert.Single(await GetHistoryAsync(factory, entity.Id));
+        var history = Assert.Single(await GetStoredHistoryAsync(factory, entity.Id));
         Assert.Equal(entity.Id, history.RequestId);
         Assert.Equal(RequestStatus.New, history.PreviousStatus);
         Assert.Equal(RequestStatus.InProgress, history.NewStatus);
@@ -46,7 +46,7 @@ public sealed class RequestStatusUpdateTests(ApiFactory factory)
         var response = await PatchStatusAsync(_client, entity.Id, Body("Waiting", original.Version, "bob"));
 
         await ProblemAssert.IsProblemAsync(response, HttpStatusCode.Conflict);
-        Assert.Single(await GetHistoryAsync(factory, entity.Id));
+        Assert.Single(await GetStoredHistoryAsync(factory, entity.Id));
         var current = await GetRequestAsync(_client, entity.Id);
         Assert.Equal(RequestStatus.InProgress, current.Status);
         Assert.Equal(firstBody.Version, current.Version);
@@ -68,7 +68,7 @@ public sealed class RequestStatusUpdateTests(ApiFactory factory)
         Assert.Equal(
             new[] { HttpStatusCode.OK, HttpStatusCode.Conflict },
             responses.Select(r => r.StatusCode).OrderBy(c => (int)c));
-        Assert.Single(await GetHistoryAsync(factory, entity.Id));
+        Assert.Single(await GetStoredHistoryAsync(factory, entity.Id));
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public sealed class RequestStatusUpdateTests(ApiFactory factory)
         var detail = problem.GetProperty("detail").GetString();
         Assert.Contains("New", detail);
         Assert.Contains("Completed", detail);
-        Assert.Empty(await GetHistoryAsync(factory, entity.Id));
+        Assert.Empty(await GetStoredHistoryAsync(factory, entity.Id));
         var current = await GetRequestAsync(_client, entity.Id);
         Assert.Equal(original.Version, current.Version);
     }

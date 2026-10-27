@@ -56,7 +56,7 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
             .ThenByDescending(h => h.Id)
             .Skip((parameters.Page - 1) * parameters.PageSize)
             .Take(parameters.PageSize)
-            .Select(StatusHistoryMapping.ToDto)
+            .Select(RequestStatusHistoryMapping.ToDto)
             .ToListAsync(cancellationToken);
 
         return new PagedResult<StatusHistoryDto>(items, parameters.Page, parameters.PageSize, totalCount);

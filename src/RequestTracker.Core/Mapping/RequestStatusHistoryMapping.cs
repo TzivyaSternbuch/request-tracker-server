@@ -4,7 +4,7 @@ using RequestTracker.Core.Entities;
 
 namespace RequestTracker.Core.Mapping;
 
-public static class StatusHistoryMapping
+public static class RequestStatusHistoryMapping
 {
     public static readonly Expression<Func<RequestStatusHistory, StatusHistoryDto>> ToDto = h => new StatusHistoryDto(
         h.Id,

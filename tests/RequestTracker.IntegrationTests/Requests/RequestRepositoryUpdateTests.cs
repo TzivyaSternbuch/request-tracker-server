@@ -26,7 +26,7 @@ public sealed class RequestRepositoryUpdateTests(ApiFactory factory)
 
         Assert.Equal(UpdateStatusOutcome.Conflict, result.Outcome);
         Assert.Null(result.Request);
-        Assert.Single(await GetHistoryAsync(factory, entity.Id));
+        Assert.Single(await GetStoredHistoryAsync(factory, entity.Id));
         var current = (await GetByIdAsync(entity.Id))!;
         Assert.Equal(RequestStatus.InProgress, current.Status);
     }
@@ -73,7 +73,7 @@ public sealed class RequestRepositoryUpdateTests(ApiFactory factory)
         Assert.Equal(
             new[] { UpdateStatusOutcome.Updated, UpdateStatusOutcome.Conflict },
             results.Select(r => r.Outcome).OrderBy(o => o));
-        Assert.Single(await GetHistoryAsync(factory, entity.Id));
+        Assert.Single(await GetStoredHistoryAsync(factory, entity.Id));
         var current = (await GetByIdAsync(entity.Id))!;
         Assert.Equal(RequestStatus.InProgress, current.Status);
     }

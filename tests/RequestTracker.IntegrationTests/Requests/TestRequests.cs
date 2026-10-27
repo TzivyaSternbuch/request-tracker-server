@@ -78,6 +78,13 @@ internal static class TestRequests
         return (await response.Content.ReadFromJsonAsync<PagedResult<RequestDto>>(JsonOptions))!;
     }
 
+    public static async Task<PagedResult<StatusHistoryDto>> GetHistoryPageAsync(HttpClient client, int id, string query)
+    {
+        var response = await client.GetAsync($"/api/requests/{id}/history?{query}");
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<PagedResult<StatusHistoryDto>>(JsonOptions))!;
+    }
+
     public static async Task<RequestDto> GetRequestAsync(HttpClient client, int id)
     {
         var response = await client.GetAsync($"/api/requests/{id}");
@@ -96,7 +103,7 @@ internal static class TestRequests
     }
 
     // Reads the table directly, to check the audit rows themselves rather than what the history endpoint returns.
-    public static async Task<List<RequestStatusHistory>> GetHistoryAsync(ApiFactory factory, int requestId)
+    public static async Task<List<RequestStatusHistory>> GetStoredHistoryAsync(ApiFactory factory, int requestId)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<RequestTrackerDbContext>();

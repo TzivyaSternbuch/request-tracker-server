@@ -22,7 +22,7 @@ public sealed class RequestHistoryTests(ApiFactory factory)
         var first = await ChangeStatusAsync(entity.Id, "InProgress", "alice");
         var second = await ChangeStatusAsync(entity.Id, "Waiting", "bob");
 
-        var page = await GetHistoryPageAsync(entity.Id, "");
+        var page = await GetHistoryPageAsync(_client, entity.Id, "");
 
         Assert.Equal(2, page.TotalCount);
         Assert.Equal(2, page.Items.Count);
@@ -52,9 +52,9 @@ public sealed class RequestHistoryTests(ApiFactory factory)
             changes.Add(await ChangeStatusAsync(entity.Id, status, "alice"));
         }
 
-        var firstPage = await GetHistoryPageAsync(entity.Id, "page=1&pageSize=2");
-        var secondPage = await GetHistoryPageAsync(entity.Id, "page=2&pageSize=2");
-        var lastPage = await GetHistoryPageAsync(entity.Id, "page=3&pageSize=2");
+        var firstPage = await GetHistoryPageAsync(_client, entity.Id, "page=1&pageSize=2");
+        var secondPage = await GetHistoryPageAsync(_client, entity.Id, "page=2&pageSize=2");
+        var lastPage = await GetHistoryPageAsync(_client, entity.Id, "page=3&pageSize=2");
 
         Assert.Equal(5, firstPage.TotalCount);
         Assert.Equal(5, secondPage.TotalCount);
@@ -75,7 +75,7 @@ public sealed class RequestHistoryTests(ApiFactory factory)
         var entity = New(NewPrefix());
         await InsertAsync(factory, entity);
 
-        var page = await GetHistoryPageAsync(entity.Id, "");
+        var page = await GetHistoryPageAsync(_client, entity.Id, "");
 
         Assert.Empty(page.Items);
         Assert.Equal(0, page.TotalCount);
@@ -84,12 +84,12 @@ public sealed class RequestHistoryTests(ApiFactory factory)
     [Fact]
     public async Task GetHistory_UnknownId_ReturnsEmptyPage()
     {
-        var page = await GetHistoryPageAsync(int.MaxValue, "");
+        var page = await GetHistoryPageAsync(_client, int.MaxValue, "");
 
         Assert.Empty(page.Items);
         Assert.Equal(0, page.TotalCount);
         Assert.Equal(1, page.Page);
-        Assert.Equal(StatusHistoryQueryParameters.DefaultPageSize, page.PageSize);
+        Assert.Equal(StatusHistoryQueryParameters.HistoryDefaultPageSize, page.PageSize);
     }
 
     [Theory]
@@ -111,12 +111,5 @@ public sealed class RequestHistoryTests(ApiFactory factory)
             _client, id, new { status, version = Convert.ToBase64String(current.Version), changedBy });
         response.EnsureSuccessStatusCode();
         return await ReadRequestAsync(response);
-    }
-
-    private async Task<PagedResult<StatusHistoryDto>> GetHistoryPageAsync(int id, string query)
-    {
-        var response = await _client.GetAsync($"/api/requests/{id}/history?{query}");
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<PagedResult<StatusHistoryDto>>(JsonOptions))!;
     }
 }
