@@ -40,7 +40,7 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<UpdateStatusResult> TryUpdateStatusAsync(
+    public async Task<UpdateStatusResult> TryUpdateStatusAsync(
         int id,
         byte[] expectedVersion,
         RequestStatus previousStatus,
@@ -49,7 +49,39 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
         DateTimeOffset changedAt,
         CancellationToken cancellationToken)
     {
-        throw new NotImplementedException();
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+        // The version check is in the UPDATE's WHERE clause, so the database decides who wins: once a concurrent
+        // writer has changed the rowversion, this statement matches no row.
+        var affected = await db.Requests
+            .Where(r => r.Id == id && r.Version == expectedVersion)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(r => r.Status, newStatus)
+                    .SetProperty(r => r.UpdatedAt, changedAt),
+                cancellationToken);
+
+        if (affected == 0)
+        {
+            // Nothing was written; disposing the transaction without a commit rolls it back.
+            var exists = await db.Requests.AnyAsync(r => r.Id == id, cancellationToken);
+            return new UpdateStatusResult(exists ? UpdateStatusOutcome.Conflict : UpdateStatusOutcome.NotFound, null);
+        }
+
+        db.RequestStatusHistory.Add(new RequestStatusHistory
+        {
+            RequestId = id,
+            PreviousStatus = previousStatus,
+            NewStatus = newStatus,
+            ChangedAt = changedAt,
+            ChangedBy = changedBy,
+        });
+        await db.SaveChangesAsync(cancellationToken);
+
+        // Read inside the transaction, so the returned version is the one this update wrote, not a later writer's.
+        var updated = await GetByIdAsync(id, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new UpdateStatusResult(UpdateStatusOutcome.Updated, updated);
     }
 
     private static IQueryable<Request> Filter(IQueryable<Request> query, RequestQueryParameters parameters)

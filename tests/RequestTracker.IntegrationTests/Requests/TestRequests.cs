@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RequestTracker.Core.Domain;
 using RequestTracker.Core.Dtos;
@@ -55,5 +56,33 @@ internal static class TestRequests
         var response = await client.GetAsync($"/api/requests?{query}");
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<PagedResult<RequestDto>>(JsonOptions))!;
+    }
+
+    public static async Task<RequestDto> GetRequestAsync(HttpClient client, int id)
+    {
+        var response = await client.GetAsync($"/api/requests/{id}");
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<RequestDto>(JsonOptions))!;
+    }
+
+    public static async Task<HttpResponseMessage> PatchStatusAsync(HttpClient client, int id, object body)
+    {
+        return await client.PatchAsJsonAsync($"/api/requests/{id}/status", body, JsonOptions);
+    }
+
+    public static async Task<RequestDto> ReadRequestAsync(HttpResponseMessage response)
+    {
+        return (await response.Content.ReadFromJsonAsync<RequestDto>(JsonOptions))!;
+    }
+
+    // Reads the table directly: the history endpoint comes in task 12.
+    public static async Task<List<RequestStatusHistory>> GetHistoryAsync(ApiFactory factory, int requestId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<RequestTrackerDbContext>();
+        return await db.RequestStatusHistory.AsNoTracking()
+            .Where(h => h.RequestId == requestId)
+            .OrderBy(h => h.Id)
+            .ToListAsync();
     }
 }
