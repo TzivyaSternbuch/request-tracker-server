@@ -18,4 +18,13 @@ public sealed class RequestsController(IRequestService service) : ControllerBase
         var result = await service.GetPagedAsync(parameters, cancellationToken);
         return Ok(result);
     }
+
+    [HttpGet("{id:int}")]
+    [ProducesResponseType<RequestDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    public async Task<ActionResult<RequestDto>> GetById(int id, CancellationToken cancellationToken)
+    {
+        var result = await service.GetByIdAsync(id, cancellationToken);
+        return Ok(result);
+    }
 }
