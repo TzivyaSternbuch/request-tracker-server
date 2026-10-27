@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using RequestTracker.Core.Domain;
 using RequestTracker.IntegrationTests.TestHost;
 using static RequestTracker.IntegrationTests.Requests.TestRequests;
@@ -22,6 +23,9 @@ public sealed class RequestStatusUpdateTests(ApiFactory factory)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await ReadRequestAsync(response);
         Assert.Equal(RequestStatus.InProgress, body.Status);
+        var raw = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        Assert.Equal(new[] { "Waiting", "Completed" },
+            raw.GetProperty("allowedStatuses").EnumerateArray().Select(e => e.GetString()));
         Assert.True(body.UpdatedAt > entity.UpdatedAt);
         Assert.NotEqual(before.Version, body.Version);
         var after = await GetRequestAsync(_client, entity.Id);

@@ -27,4 +27,28 @@ public sealed class StatusTransitionsTests
 
         Assert.Equal(expected, result);
     }
+
+    [Theory]
+    [InlineData(RequestStatus.New, new[] { RequestStatus.InProgress })]
+    [InlineData(RequestStatus.InProgress, new[] { RequestStatus.Waiting, RequestStatus.Completed })]
+    [InlineData(RequestStatus.Waiting, new[] { RequestStatus.InProgress, RequestStatus.Completed })]
+    [InlineData(RequestStatus.Completed, new[] { RequestStatus.InProgress })]
+    public void AllowedFrom_EveryStatus_ListsTheMatrixTargets(RequestStatus from, RequestStatus[] expected)
+    {
+        var result = StatusTransitions.AllowedFrom(from);
+
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void AllowedFrom_EveryStatus_AgreesWithIsAllowed()
+    {
+        foreach (var from in Enum.GetValues<RequestStatus>())
+        {
+            var allowed = StatusTransitions.AllowedFrom(from);
+
+            foreach (var to in Enum.GetValues<RequestStatus>())
+                Assert.Equal(allowed.Contains(to), StatusTransitions.IsAllowed(from, to));
+        }
+    }
 }

@@ -32,6 +32,8 @@ public sealed class RequestDetailsTests(ApiFactory factory)
         Assert.Equal(entity.CreatedAt, body.GetProperty("createdAt").GetDateTimeOffset());
         Assert.Equal(entity.UpdatedAt, body.GetProperty("updatedAt").GetDateTimeOffset());
         Assert.Equal(8, Convert.FromBase64String(body.GetProperty("version").GetString()!).Length);
+        Assert.Equal(new[] { "Waiting", "Completed" },
+            body.GetProperty("allowedStatuses").EnumerateArray().Select(e => e.GetString()));
     }
 
     [Fact]
