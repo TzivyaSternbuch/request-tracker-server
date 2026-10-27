@@ -90,6 +90,21 @@ public sealed class ErrorHandlingTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task Throw_BadHttpRequestException_ReturnsItsStatusWithoutErrorLog()
+    {
+        var logs = new CapturingLoggerProvider();
+        using var host = factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services => services.AddSingleton<ILoggerProvider>(logs)));
+        var client = host.CreateClient();
+
+        var response = await client.GetAsync("/test/throw/badrequest");
+
+        var body = await ProblemAssert.IsProblemAsync(response, HttpStatusCode.RequestEntityTooLarge);
+        Assert.DoesNotContain(TestController.InternalMessage, body.GetRawText());
+        Assert.DoesNotContain(LogLevel.Error, logs.Levels);
+    }
+
+    [Fact]
     public async Task Throw_UnexpectedException_Returns500WithoutInternals()
     {
         var response = await _client.GetAsync("/test/throw/unexpected");
