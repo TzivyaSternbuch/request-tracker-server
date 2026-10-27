@@ -20,4 +20,6 @@ public interface IRequestRepository
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<string>> GetAssigneesAsync(CancellationToken cancellationToken);
+
+    Task<RequestStatsDto> GetStatsAsync(DateTimeOffset asOf, CancellationToken cancellationToken);
 }

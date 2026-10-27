@@ -41,6 +41,15 @@ public sealed class RequestsController(IRequestService service) : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("stats")]
+    [ProducesResponseType<RequestStatsDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status500InternalServerError, "application/problem+json")]
+    public async Task<ActionResult<RequestStatsDto>> GetStats(CancellationToken cancellationToken)
+    {
+        var result = await service.GetStatsAsync(cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet("assignees")]
     [ProducesResponseType<IReadOnlyList<string>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<string>>> GetAssignees(CancellationToken cancellationToken)

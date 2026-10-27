@@ -12,6 +12,10 @@ namespace RequestTracker.Infrastructure.Repositories;
 
 public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepository
 {
+    private static readonly TimeSpan SevenDays = TimeSpan.FromDays(7);
+    private static readonly TimeSpan ThirtyDays = TimeSpan.FromDays(30);
+    private const int TopAssigneeCount = 5;
+
     public async Task<PagedResult<RequestDto>> GetPagedAsync(
         RequestQueryParameters parameters, CancellationToken cancellationToken)
     {
@@ -92,6 +96,57 @@ public sealed class RequestRepository(RequestTrackerDbContext db) : IRequestRepo
             .OrderBy(a => a)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<RequestStatsDto> GetStatsAsync(DateTimeOffset asOf, CancellationToken cancellationToken)
+    {
+        // One after another: a DbContext does not allow parallel queries.
+        var countByStatus = await GroupCountByStatusAsync(cancellationToken);
+        var openRequestAge = await BucketOpenRequestsByAgeAsync(asOf, cancellationToken);
+        var topAssignees = await RankAssigneesByOpenCountAsync(cancellationToken);
+        return new RequestStatsDto(asOf, countByStatus, openRequestAge, topAssignees);
+    }
+
+    private async Task<Dictionary<RequestStatus, int>> GroupCountByStatusAsync(CancellationToken cancellationToken)
+    {
+        var countsFromDb = await db.Requests.AsNoTracking()
+            .GroupBy(r => r.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Status, x => x.Count, cancellationToken);
+        return Enum.GetValues<RequestStatus>()
+            .ToDictionary(status => status, status => countsFromDb.GetValueOrDefault(status));
+    }
+
+    private async Task<OpenRequestAgeDto> BucketOpenRequestsByAgeAsync(DateTimeOffset asOf, CancellationToken cancellationToken)
+    {
+        // Age is measured from CreatedAt. A request exactly 7 (or 30) days old belongs to the older bucket.
+        var sevenDaysAgo = asOf - SevenDays;
+        var thirtyDaysAgo = asOf - ThirtyDays;
+        var age = await OpenRequests()
+            .GroupBy(_ => 1)
+            .Select(g => new OpenRequestAgeDto(
+                g.Count(r => r.CreatedAt > sevenDaysAgo),
+                g.Count(r => r.CreatedAt <= sevenDaysAgo && r.CreatedAt > thirtyDaysAgo),
+                g.Count(r => r.CreatedAt <= thirtyDaysAgo)))
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return age ?? new OpenRequestAgeDto(0, 0, 0);
+    }
+
+    private async Task<List<AssigneeWorkloadDto>> RankAssigneesByOpenCountAsync(CancellationToken cancellationToken)
+    {
+        var rows = await OpenRequests()
+            .Where(r => r.AssignedTo != "")
+            .GroupBy(r => r.AssignedTo)
+            .Select(g => new { AssignedTo = g.Key, OpenCount = g.Count() })
+            .OrderByDescending(a => a.OpenCount)
+            .ThenBy(a => a.AssignedTo)
+            .Take(TopAssigneeCount)
+            .ToListAsync(cancellationToken);
+        return rows.Select(a => new AssigneeWorkloadDto(a.AssignedTo, a.OpenCount)).ToList();
+    }
+
+    private IQueryable<Request> OpenRequests() =>
+        db.Requests.AsNoTracking().Where(r => r.Status != RequestStatus.Completed);
 
     private static IQueryable<Request> Filter(IQueryable<Request> query, RequestQueryParameters parameters)
     {

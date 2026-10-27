@@ -2,7 +2,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.DependencyInjection;
+using RequestTracker.Core.Caching;
 using RequestTracker.Core.Domain;
 using RequestTracker.Core.Dtos;
 using RequestTracker.Core.Entities;
@@ -17,7 +19,7 @@ internal static class TestRequests
 {
     public static readonly DateTimeOffset BaseTime = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() },
     };
@@ -49,6 +51,24 @@ internal static class TestRequests
         var db = scope.ServiceProvider.GetRequiredService<RequestTrackerDbContext>();
         db.Requests.AddRange(requests);
         await db.SaveChangesAsync();
+    }
+
+    // For tests of global figures (statistics): history first, its foreign key restricts deleting the requests.
+    // Deletes every row in the shared database, so it is only safe because all integration test classes belong to
+    // ApiCollection, whose tests run one at a time. A class outside that collection could lose its rows mid-test.
+    public static async Task ClearAsync(ApiFactory factory)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<RequestTrackerDbContext>();
+        await db.RequestStatusHistory.ExecuteDeleteAsync();
+        await db.Requests.ExecuteDeleteAsync();
+    }
+
+    // Rows inserted straight into the database bypass the service, so the cached statistics must be dropped by hand.
+    public static async Task InvalidateStatsAsync(ApiFactory factory)
+    {
+        var cache = factory.Services.GetRequiredService<HybridCache>();
+        await cache.RemoveByTagAsync(CacheKeys.StatsTag);
     }
 
     public static async Task<PagedResult<RequestDto>> GetPageAsync(HttpClient client, string query)
