@@ -1,5 +1,6 @@
 using FluentValidation;
 using FluentValidation.Results;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using RequestTracker.Core.Exceptions;
 
@@ -30,6 +31,7 @@ public sealed class TestController : ControllerBase
         "validation-unnamed" => throw new ValidationException(
             [new ValidationFailure(null!, RequestLevelValidationMessage)]),
         "aborted" => Abort(),
+        "badrequest" => throw new BadHttpRequestException(InternalMessage, StatusCodes.Status413PayloadTooLarge),
         _ => throw new InvalidOperationException(InternalMessage),
     };
 

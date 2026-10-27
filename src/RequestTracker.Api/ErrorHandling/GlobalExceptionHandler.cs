@@ -16,6 +16,8 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
             NotFoundException => Problem(StatusCodes.Status404NotFound, exception.Message),
             ConcurrencyConflictException => Problem(StatusCodes.Status409Conflict, exception.Message),
             InvalidStatusTransitionException => Problem(StatusCodes.Status422UnprocessableEntity, exception.Message),
+            // A request the server could not read (e.g. a body over the size limit) is the client's error, not ours.
+            BadHttpRequestException badRequest => Problem(badRequest.StatusCode, detail: null),
             _ => null,
         };
 
